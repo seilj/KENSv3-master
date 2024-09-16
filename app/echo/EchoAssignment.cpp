@@ -87,7 +87,13 @@ int EchoAssignment::serverMain(const char *bind_ip, int port,
   } else if(strcmp(buffer, "whoami") == 0){
     response = std::string(client_ip);
   } else if(strcmp(buffer, "whoru") == 0){
-    response = std::string(bind_ip);
+    struct sockaddr_in server_info;
+    socklen_t server_info_len = sizeof(server_info);
+    getsockname(client_fd, (struct sockaddr *)&server_info, &server_info_len);
+
+    char server_ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &server_info.sin_addr, server_ip, INET_ADDRSTRLEN);
+    response = std::string(server_ip);
   } else{
     response = std::string(buffer);
   }
