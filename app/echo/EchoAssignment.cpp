@@ -50,17 +50,27 @@ int EchoAssignment::serverMain(const char *bind_ip, int port,
   socklen_t client_len = sizeof(client_addr);
   memset(&client_addr, 0, client_len);
   int client_fd = accept(server_socket, (struct sockaddr *)&client_addr, &client_len);
-  if(client_fd<0) return -1;
+  if(client_fd<0){
+    close(server_socket);
+    return -1;
+  }
 
   //read
   char buffer[1024] = {0};
   int valread = read(client_fd, buffer, 1024);
-  if(valread<0) return -1;
+  if(valread<0){
+    close(client_fd);
+    close(server_socket);
+    return -1;
+  }
+  buffer[valread-1] = '\0';
 
   //submit answer
   struct sockaddr_in client_info;
   socklen_t client_info_len = sizeof(client_info);
   if (getpeername(client_fd, (struct sockaddr *)&client_info, &client_info_len) < 0) {
+    close(client_fd);
+    close(server_socket);
     return -1;
   }
 
@@ -72,12 +82,23 @@ int EchoAssignment::serverMain(const char *bind_ip, int port,
   //write
   std::string response;
 
-  if (strcmp(buffer, "hello\n") == 0) {
-    response = std::string(server_hello) + "\n";
+  if (strcmp(buffer, "hello") == 0) {
+    response = std::string(server_hello);
+  } else if(strcmp(buffer, "whoami") == 0){
+    response = std::string(client_ip);
+  } else if(strcmp(buffer, "whoru") == 0){
+    response = std::string(bind_ip);
+  } else{
+    response = std::string(buffer);
   }
+  response += "\n";
   
   int valwrite = write(client_fd, response.c_str(), response.size());
-  if(valwrite<0) return -1;
+  if(valwrite<0){
+    close(client_fd);
+    close(server_socket);
+    return -1;
+  }
 
   //close socket
   close(client_fd);
@@ -104,16 +125,27 @@ int EchoAssignment::clientMain(const char *server_ip, int port,
   addr.sin_family = AF_INET;
   inet_pton(AF_INET, server_ip, &addr.sin_addr);
   addr.sin_port = htons(port);
-  if(connect(client_socket, (struct sockaddr *)&addr, len)<0) return -1;
+  if(connect(client_socket, (struct sockaddr *)&addr, len)<0){
+    close(client_socket);
+    return -1;
+  }
 
   //write
   std::string request = std::string(command) + "\n";
   int valwrite = write(client_socket, request.c_str(), request.size());
-  if(valwrite<0) return -1;
+  if(valwrite<0){
+    close(client_socket);
+    return -1;
+  }
 
   //read
   char buffer[1024] = {0};
   int valread = read(client_socket, buffer, 1024);
+  if(valread<0){
+    close(client_socket);
+    return -1;
+  }
+  buffer[valread-1] = '\0';
 
   //submit answer
   submitAnswer(server_ip, buffer);
