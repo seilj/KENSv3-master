@@ -114,7 +114,12 @@ int EchoAssignment::clientMain(const char *server_ip, int port,
   //read
   char buffer[1024] = {0};
   int valread = read(client_socket, buffer, 1024);
+
+  //submit answer
   submitAnswer(server_ip, buffer);
+
+  //close socket
+  close(client_socket);
 
   return 0;
 }
