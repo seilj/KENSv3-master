@@ -43,73 +43,75 @@ int EchoAssignment::serverMain(const char *bind_ip, int port,
   if(bind(server_socket, (struct sockaddr *)&addr, len)<0) return -1;
 
   //listen
-  if(listen(server_socket, 3)<0) return -1;
+  if(listen(server_socket, 1024)<0) return -1;
 
-  //accept
-  struct sockaddr_in client_addr;
-  socklen_t client_len = sizeof(client_addr);
-  memset(&client_addr, 0, client_len);
-  int client_fd = accept(server_socket, (struct sockaddr *)&client_addr, &client_len);
-  if(client_fd<0){
-    close(server_socket);
-    return -1;
-  }
+  while(true){
+    //accept
+    struct sockaddr_in client_addr;
+    socklen_t client_len = sizeof(client_addr);
+    memset(&client_addr, 0, client_len);
+    int client_fd = accept(server_socket, (struct sockaddr *)&client_addr, &client_len);
+    if(client_fd<0){
+      close(server_socket);
+      return -1;
+    }
 
-  //read
-  char buffer[1024] = {0};
-  int valread = read(client_fd, buffer, 1024);
-  if(valread<0){
+    //read
+    char buffer[1024] = {0};
+    int valread = read(client_fd, buffer, 1024);
+    if(valread<0){
+      close(client_fd);
+      close(server_socket);
+      return -1;
+    }
+    buffer[valread-1] = '\0';
+
+    //submit answer
+    struct sockaddr_in client_info;
+    socklen_t client_info_len = sizeof(client_info);
+    if (getpeername(client_fd, (struct sockaddr *)&client_info, &client_info_len) < 0) {
+      close(client_fd);
+      close(server_socket);
+      return -1;
+    }
+
+    char client_ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &client_info.sin_addr, client_ip, INET_ADDRSTRLEN);
+    submitAnswer(client_ip, buffer);
+
+    //write
+    std::string response;
+
+    if (strcmp(buffer, "hello") == 0) {
+      response = std::string(server_hello);
+    } else if(strcmp(buffer, "whoami") == 0){
+      response = std::string(client_ip);
+    } else if(strcmp(buffer, "whoru") == 0){
+      struct sockaddr_in server_info;
+      socklen_t server_info_len = sizeof(server_info);
+      getsockname(client_fd, (struct sockaddr *)&server_info, &server_info_len);
+
+      char server_ip[INET_ADDRSTRLEN];
+      inet_ntop(AF_INET, &server_info.sin_addr, server_ip, INET_ADDRSTRLEN);
+      response = std::string(server_ip);
+    } else{
+      response = std::string(buffer);
+    }
+    response += "\n";
+    
+    int valwrite = write(client_fd, response.c_str(), response.size());
+    if(valwrite<0){
+      close(client_fd);
+      close(server_socket);
+      return -1;
+    }
+
+    //close socket
     close(client_fd);
-    close(server_socket);
-    return -1;
-  }
-  buffer[valread-1] = '\0';
-
-  //submit answer
-  struct sockaddr_in client_info;
-  socklen_t client_info_len = sizeof(client_info);
-  if (getpeername(client_fd, (struct sockaddr *)&client_info, &client_info_len) < 0) {
-    close(client_fd);
-    close(server_socket);
-    return -1;
   }
 
-  char client_ip[INET_ADDRSTRLEN];
-  inet_ntop(AF_INET, &client_info.sin_addr, client_ip, INET_ADDRSTRLEN);
 
-  submitAnswer(client_ip, buffer);
-
-  //write
-  std::string response;
-
-  if (strcmp(buffer, "hello") == 0) {
-    response = std::string(server_hello);
-  } else if(strcmp(buffer, "whoami") == 0){
-    response = std::string(client_ip);
-  } else if(strcmp(buffer, "whoru") == 0){
-    struct sockaddr_in server_info;
-    socklen_t server_info_len = sizeof(server_info);
-    getsockname(client_fd, (struct sockaddr *)&server_info, &server_info_len);
-
-    char server_ip[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &server_info.sin_addr, server_ip, INET_ADDRSTRLEN);
-    response = std::string(server_ip);
-  } else{
-    response = std::string(buffer);
-  }
-  response += "\n";
-  
-  int valwrite = write(client_fd, response.c_str(), response.size());
-  if(valwrite<0){
-    close(client_fd);
-    close(server_socket);
-    return -1;
-  }
-
-  //close socket
-  close(client_fd);
   close(server_socket);
-
   return 0;
 }
 
